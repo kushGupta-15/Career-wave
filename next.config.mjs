@@ -1,12 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  swcMinify: true,
   images: {
-    domains: ['images.unsplash.com', 'uploadthing.com', 'utfs.io'], // Added 'utfs.io'
-  },
-  experimental: {
-    serverActions: true,
+    remotePatterns: [
+      { protocol: 'https', hostname: 'images.unsplash.com' },
+      { protocol: 'https', hostname: 'uploadthing.com' },
+      { protocol: 'https', hostname: 'utfs.io' },
+    ],
   },
 };
 
