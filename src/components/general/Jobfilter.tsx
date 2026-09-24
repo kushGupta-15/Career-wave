@@ -80,17 +80,17 @@ export function JobFilter() {
     checked ? set.add(jobType) : set.delete(jobType);
 
     router.push(
-      `?${createQueryString({ jobTypes: Array.from(set).join(",") })}`
+      `/jobs?${createQueryString({ jobTypes: Array.from(set).join(",") })}`
     );
   }
 
   function handleLocationChange(location: string) {
-    router.push(`?${createQueryString({ location })}`);
+    router.push(`/jobs?${createQueryString({ location })}`);
   }
 
   function handleDatePostedChange(value: string) {
     router.push(
-      `?${createQueryString({
+      `/jobs?${createQueryString({
         datePosted: value === "any" ? "" : value,
       })}`
     );
@@ -98,7 +98,7 @@ export function JobFilter() {
 
   function applySalaryFilter() {
     router.push(
-      `?${createQueryString({
+      `/jobs?${createQueryString({
         salaryMin: salaryRange[0].toString(),
         salaryMax: salaryRange[1].toString(),
       })}`

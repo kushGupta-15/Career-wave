@@ -1,6 +1,6 @@
 # Career Wave
 
-Career Wave is a Next.js job board platform built with Prisma, NextAuth, Stripe, Inngest, Uploadthing, Arcjet, and Tailwind CSS. It supports company and job seeker onboarding, paid job posting, saved jobs, and an application tracking flow, with OAuth login via Google and GitHub.
+Career Wave is a Next.js job board platform built with Prisma, NextAuth, Inngest, Uploadthing, Arcjet, and Tailwind CSS. It supports company and job seeker onboarding, direct job posting, saved jobs, and an application tracking flow, with OAuth login via Google and GitHub.
 
 ## Key Features
 
@@ -10,7 +10,7 @@ Career Wave is a Next.js job board platform built with Prisma, NextAuth, Stripe,
 - Job seeker onboarding and job application flow
 - Saved jobs ("Favorites") for job seekers
 - Company-side candidate application tracking dashboard (status updates, notes)
-- Stripe-powered paid job postings (Checkout + webhook activation flow)
+- Immediate active job posting flow
 - Job expiration scheduling via Inngest, with cancellation on manual delete
 - File uploads via Uploadthing (company logos, PDF resumes)
 - Bot/abuse protection on all mutating server actions via Arcjet
@@ -21,9 +21,7 @@ Career Wave is a Next.js job board platform built with Prisma, NextAuth, Stripe,
 - **Chatbot is not AI-powered.** `/api/chat` matches keywords (e.g. "job", "career", "company") against a small set of hardcoded canned responses. There is no LLM integration.
 - **Search suggestions are static, not analytics-driven.** `SearchSuggestions.tsx` renders a hardcoded list of popular searches/locations/companies. A `searchAnalytics.ts` utility exists with tracking/suggestion functions but is not called anywhere in the app and uses in-memory (non-persistent) storage — it is currently dead code.
 - **Periodic job listing emails go to a single hardcoded address**, not to individual job seekers. The Inngest function `sendPeriodicJobListings` does not look up the job seeker's real email from `userId`.
-- **Job application creation/lookup uses defensive `as unknown as` type casts** around `prisma.jobApplication`, with fallback error messages ("Application system is currently being updated") suggesting this was worked around after a Prisma client generation issue rather than cleanly typed. Functionally works if the Prisma client is in sync with the schema, but is fragile.
 - **Arcjet configuration is minimal.** Only `shield` and `detectBot` rules are applied; `fixedWindow`/`tokenBucket` rate-limiting helpers are imported/exported but unused.
-- **Post-job page contains placeholder marketing content** (fabricated testimonials, hardcoded stats, duplicated logos) that is not sourced from real data.
 
 ## Tech Stack
 
@@ -31,7 +29,6 @@ Career Wave is a Next.js job board platform built with Prisma, NextAuth, Stripe,
 - `TypeScript`
 - `Prisma` + PostgreSQL
 - `NextAuth` for authentication
-- `Stripe` payments
 - `Inngest` for background job scheduling
 - `Uploadthing` for file upload handling
 - `Arcjet` for bot detection / request shielding
@@ -44,9 +41,9 @@ Career Wave is a Next.js job board platform built with Prisma, NextAuth, Stripe,
 
 - `src/app/` - main app routes and pages
 - `src/app/(mainLayout)/` - authenticated layout and main pages
-- `src/app/api/` - API routes for auth, uploadthing, stripe webhook, inngest, and chat
+- `src/app/api/` - API routes for auth, uploadthing, inngest, and chat
 - `src/components/` - UI and form components
-- `src/app/utils/` - shared utilities, database client, auth, schemas, and Stripe setup
+- `src/app/utils/` - shared utilities, database client, auth, and schemas
 - `src/app/action.ts` - server actions (job posting, applications, saved jobs)
 - `prisma/schema.prisma` - database schema
 
@@ -64,8 +61,6 @@ DATABASE_URL=postgresql://user:password@host:port/database
 UPLOADTHING_TOKEN=your-uploadthing-token
 NEXT_PUBLIC_URL=http://localhost:3000
 NEXTAUTH_URL=http://localhost:3000
-SECRET_STRIPE_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
 RESEND_API_KEY=your-resend-api-key
 ARCJET_KEY=your-arcjet-key
 ```
@@ -86,11 +81,6 @@ ARCJET_KEY=your-arcjet-key
 
 3. Run database migrations or push schema:
    ```bash
-   pnpm prisma migrate dev --name init
-   ```
-
-   Or, if you just want to sync schema without migrations:
-   ```bash
    pnpm prisma db push
    ```
 
@@ -105,13 +95,6 @@ For local development, configure Google and GitHub OAuth redirect URLs as:
 
 - `http://localhost:3000/api/auth/callback/google`
 - `http://localhost:3000/api/auth/callback/github`
-
-## Stripe
-
-Stripe is used for paid job posting checkout and webhook handling. When a company creates a job post, a Checkout Session is created and the job is stored with `status: DRAFT`. On `checkout.session.completed`, the webhook at `src/app/api/webhook/stripe/route.ts` updates the job to `status: ACTIVE`, at which point it becomes visible in public job listings. If you do not have Stripe configured, add these values to your `.env` and create the webhook in the Stripe dashboard:
-
-- `SECRET_STRIPE_KEY`
-- `STRIPE_WEBHOOK_SECRET`
 
 ## Inngest
 
@@ -134,8 +117,6 @@ To deploy on Vercel, make sure you set the same environment variables in the Ver
 - `UPLOADTHING_TOKEN`
 - `NEXT_PUBLIC_URL`
 - `NEXTAUTH_URL`
-- `SECRET_STRIPE_KEY`
-- `STRIPE_WEBHOOK_SECRET`
 - `RESEND_API_KEY`
 - `ARCJET_KEY`
 
@@ -151,4 +132,4 @@ If you use custom domains, replace the Vercel host accordingly.
 - The app expects `Company` and `JobSeeker` relationships in the database.
 - `NextAuth` uses the `Account`, `Session`, and `VerificationToken` Prisma tables.
 - Every mutating server action in `src/app/action.ts` runs through Arcjet's `shield` and `detectBot` rules before executing.
-- Public job listings only show jobs with `status: ACTIVE` — a job is not publicly visible until Stripe payment completes.
+- Public job listings show all jobs with `status: ACTIVE`.

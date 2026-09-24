@@ -53,7 +53,7 @@ export function SearchBar() {
       search: searchTerm,
       company: companyTerm,
     });
-    router.push(`/?${queryString}`);
+    router.push(`/jobs?${queryString}`);
     setShowSuggestions(false);
   };
 
@@ -64,19 +64,19 @@ export function SearchBar() {
         search: suggestion,
         company: companyTerm,
       });
-      router.push(`/?${queryString}`);
+      router.push(`/jobs?${queryString}`);
     } else if (type === 'company') {
       setCompanyTerm(suggestion);
       const queryString = createQueryString({
         search: searchTerm,
         company: suggestion,
       });
-      router.push(`/?${queryString}`);
+      router.push(`/jobs?${queryString}`);
     } else if (type === 'location') {
       const queryString = createQueryString({
         location: suggestion,
       });
-      router.push(`/?${queryString}`);
+      router.push(`/jobs?${queryString}`);
     }
     setShowSuggestions(false);
   };
@@ -86,7 +86,7 @@ export function SearchBar() {
       sortBy,
       sortOrder: currentSortOrder,
     });
-    router.push(`/?${queryString}`);
+    router.push(`/jobs?${queryString}`);
   };
 
   const toggleSortOrder = () => {
@@ -95,7 +95,7 @@ export function SearchBar() {
       sortBy: currentSortBy,
       sortOrder: newOrder,
     });
-    router.push(`/?${queryString}`);
+    router.push(`/jobs?${queryString}`);
   };
 
   const clearSearch = () => {
@@ -105,13 +105,13 @@ export function SearchBar() {
       search: "",
       company: "",
     });
-    router.push(`/?${queryString}`);
+    router.push(`/jobs?${queryString}`);
   };
 
   const clearAllFilters = () => {
     setSearchTerm("");
     setCompanyTerm("");
-    router.push("/");
+    router.push("/jobs");
   };
 
   // Handle Enter key press

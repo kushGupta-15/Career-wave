@@ -41,10 +41,9 @@ export function JobListingDurationSelector({ field }: iAppProps) {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-xl">${duration.price}</p>
-                    <p className="text-sm text-muted-foreground">
-                      ${(duration.price / duration.days).toFixed(2)}/days
-                    </p>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                      Free Listing
+                    </span>
                   </div>
                 </div>
               </Card>

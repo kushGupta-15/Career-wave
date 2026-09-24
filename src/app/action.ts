@@ -7,7 +7,6 @@ import { companySchema, jobPostSchema, jobSchema } from "./utils/zodSchemas";
 import { z } from "zod";
 import arcjet, { detectBot, shield } from "./utils/arcjet";
 import { request } from "@arcjet/next";
-import { stripe } from "./utils/stripe";
 import { jobListingDurationPricing } from "./utils/jobListingDurationPricing";
 import { inngest } from "./utils/inngest/client";
 import { revalidatePath } from "next/cache";
@@ -104,39 +103,12 @@ export async function createJob(data: z.infer<typeof jobPostSchema>) {
         },
         select: {
             id: true,
-            user: {
-                select: {
-                    stripeCustomerId: true,
-                }
-            }
         }
+    });
 
-    })
     if (!company?.id) {
         return redirect('/onboarding');
     }
-
-    let stripeCustomerId = company.user.stripeCustomerId;
-    if (!stripeCustomerId) {
-        const customer = await stripe.customers.create({
-            email: user.email as string,
-            name: user.name as string,
-        });
-
-        stripeCustomerId = customer.id;
-
-        // update user with stripe customer id
-
-        await prisma.user.update({
-            where: {
-                id: user.id,
-            },
-            data: {
-                stripeCustomerId: customer.id,
-            },
-        });
-    }
-
 
     const jobPost = await prisma.jobPost.create({
         data: {
@@ -149,55 +121,26 @@ export async function createJob(data: z.infer<typeof jobPostSchema>) {
             salaryTo: validateData.salaryTo,
             benefits: validateData.benefits,
             companyId: company.id,
+            status: "ACTIVE",
         },
         select: {
             id: true,
         }
     });
 
-    const pricingTier = jobListingDurationPricing.find(
-        (tier) => tier.days === validateData.listingDuration
-    );
-    if (!pricingTier) {
-        throw new Error("Invalid listing duration selected");
+    try {
+        await inngest.send({
+            name: "job/created",
+            data: {
+                jobId: jobPost.id,
+                expirationDays: validateData.listingDuration,
+            }
+        });
+    } catch (inngestError) {
+        console.warn("Inngest event dispatch skipped or failed:", inngestError);
     }
 
-    await inngest.send({
-        name: "job/created",
-        data: {
-            jobId: jobPost.id,
-            expirationDays: validateData.listingDuration,
-        }
-    })
-
-    const session = await stripe.checkout.sessions.create({
-        customer: stripeCustomerId,
-        line_items: [
-            {
-                price_data: {
-                    product_data: {
-                        name: `Job Posting - ${pricingTier.days} Days`,
-                        description: pricingTier.description,
-                        images: [
-                            "https://ido7tjyo2l.ufs.sh/f/w49lbr5cJiZ6N0ZgWmJPlh6qrOnk2EQdmI71wfYAM5SRjecu",
-                        ]
-                    },
-                    currency: 'USD',
-                    unit_amount: pricingTier.price * 100,
-                },
-                quantity: 1,
-            }
-        ],
-        metadata: {
-            jobId: jobPost.id,
-        },
-        mode: 'payment',
-        success_url: `${process.env.NEXT_PUBLIC_URL}/payment/success`,
-        cancel_url: `${process.env.NEXT_PUBLIC_URL}/payment/cancel`,
-
-    })
-
-    return redirect(session.url as string);
+    return redirect("/my-jobs");
 }
 
 export async function saveJobPost(jobId: string) {
@@ -461,9 +404,14 @@ export async function deleteJobPost(jobId: string) {
         }
     });
 
-    await inngest.send({
-        name: 'job/cancel.expiration',
-        data: { jobId: jobId },
-    });
+    try {
+        await inngest.send({
+            name: 'job/cancel.expiration',
+            data: { jobId: jobId },
+        });
+    } catch (inngestError) {
+        console.warn("Inngest event dispatch skipped or failed:", inngestError);
+    }
+
     return redirect("/my-jobs");
 }
