@@ -7,7 +7,6 @@ import { companySchema, jobPostSchema, jobSchema } from "./utils/zodSchemas";
 import { z } from "zod";
 import arcjet, { detectBot, shield } from "./utils/arcjet";
 import { request } from "@arcjet/next";
-import { jobListingDurationPricing } from "./utils/jobListingDurationPricing";
 import { inngest } from "./utils/inngest/client";
 import { revalidatePath } from "next/cache";
 
