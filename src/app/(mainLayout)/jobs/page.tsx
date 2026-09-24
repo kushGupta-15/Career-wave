@@ -36,7 +36,7 @@ export default async function Home({ searchParams }: SearchParams) {
   const filterKey = `page=${currentPage};types=${jobTypes.join(",")};location=${location};search=${search};company=${company};salaryMin=${salaryMin};salaryMax=${salaryMax};datePosted=${datePosted};sortBy=${sortBy};sortOrder=${sortOrder}`;
   
   return (
-    <div className="space-y-6 pt-20">
+    <div className="space-y-6">
       <ClientSearchBar />
       
       {/* Mobile Filter Button */}

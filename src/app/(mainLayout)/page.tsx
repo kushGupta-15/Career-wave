@@ -6,7 +6,7 @@ import { ClientSearchBar } from "@/components/general/ClientSearchBar";
 export default function LandingPage() {
   return (
     <>
-    <main className="pt-20">
+    <main>
       {/* ================= HERO SECTION ================= */}
       <section
         className="
