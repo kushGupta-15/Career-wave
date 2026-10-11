@@ -60,8 +60,8 @@ export default function LandingPage() {
             <p className="text-muted-foreground mt-1">Countries</p>
           </div>
           <div>
-            <p className="text-3xl font-bold">100%</p>
-            <p className="text-muted-foreground mt-1">Free for Candidates</p>
+            <p className="text-3xl font-bold">95%</p>
+            <p className="text-muted-foreground mt-1">Verified Placements</p>
           </div>
         </div>
       </section>
