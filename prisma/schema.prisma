@@ -42,7 +42,7 @@ model Company {
   website  String
   xAccount String?
   JobPost  JobPost[]
-  user     User      @relation(fields: [userId], references: [id])
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId   String    @unique
 
   createdAt DateTime @default(now())
@@ -54,7 +54,7 @@ model JobSeeker {
   name      String
   about     String
   resume    String
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -113,7 +113,7 @@ model JobPost {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  Company   Company  @relation(fields: [companyId], references: [id])
+  Company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   companyId String
 
   SavedJobPost    SavedJobPost[]
@@ -128,9 +128,9 @@ enum JobpostStatus {
 
 model JobApplication {
   id        String            @id @default(uuid())
-  JobPost   JobPost           @relation(fields: [jobPostId], references: [id])
+  JobPost   JobPost           @relation(fields: [jobPostId], references: [id], onDelete: Cascade)
   jobPostId String
-  User      User              @relation(fields: [userId], references: [id])
+  User      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
   
   // Application details
@@ -158,9 +158,9 @@ enum ApplicationStatus {
 
 model SavedJobPost {
   id        String  @id @default(uuid())
-  JobPost   JobPost @relation(fields: [jobPostId], references: [id])
+  JobPost   JobPost @relation(fields: [jobPostId], references: [id], onDelete: Cascade)
   jobPostId String
-  User      User   @relation(fields: [userId], references: [id])
+  User      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
 
   createdAt DateTime @default(now())

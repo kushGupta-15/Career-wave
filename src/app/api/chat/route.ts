@@ -1,4 +1,18 @@
 import { NextResponse } from 'next/server';
+import arcjet, { detectBot, shield } from '@/app/utils/arcjet';
+
+const aj = arcjet
+  .withRule(
+    shield({
+      mode: "LIVE",
+    })
+  )
+  .withRule(
+    detectBot({
+      mode: "LIVE",
+      allow: [],
+    })
+  );
 
 const botResponses = {
   greeting: "Hello! I'm the Career Wave Assistant. How can I help you today?",
@@ -10,6 +24,14 @@ const botResponses = {
 
 export async function POST(request: Request) {
   try {
+    const decision = await aj.protect(request);
+    if (decision.isDenied()) {
+      return NextResponse.json(
+        { error: "Access denied" },
+        { status: 403 }
+      );
+    }
+
     const { message } = await request.json();
     const userMessage = message.toLowerCase();
     

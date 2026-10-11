@@ -81,8 +81,19 @@ export async function createJobSeeker(data: z.infer<typeof jobSchema>) {
             },
         },
     });
-    return redirect("/");
 
+    try {
+        await inngest.send({
+            name: "jobseeker/created",
+            data: {
+                userId: user.id as string,
+            }
+        });
+    } catch (inngestError) {
+        console.warn("Inngest event dispatch skipped or failed:", inngestError);
+    }
+
+    return redirect("/");
 }
 
 
@@ -195,7 +206,34 @@ export async function applyToJob(jobId: string, coverLetter?: string, resumeUrl?
     }
 
     try {
-        // Check if user is a job seeker
+        // 1. Verify job exists and is ACTIVE
+        const job = await prisma.jobPost.findUnique({
+            where: {
+                id: jobId,
+            },
+            select: {
+                status: true,
+                Company: {
+                    select: {
+                        userId: true,
+                    }
+                }
+            }
+        });
+
+        if (!job) {
+            throw new Error("Job not found");
+        }
+
+        if (job.status !== "ACTIVE") {
+            throw new Error("This job is no longer accepting applications");
+        }
+
+        if (job.Company.userId === user.id) {
+            throw new Error("You cannot apply to your own job listing");
+        }
+
+        // 2. Check if user is a job seeker
         const jobSeeker = await prisma.jobSeeker.findUnique({
             where: {
                 userId: user.id,
@@ -207,65 +245,33 @@ export async function applyToJob(jobId: string, coverLetter?: string, resumeUrl?
         });
 
         if (!jobSeeker) {
-            throw new Error("Only job seekers can apply to jobs");
+            throw new Error("Only job seekers can apply to jobs. Please complete onboarding first.");
         }
 
-        // Check if already applied
-        let existingApplication = null;
-        try {
-            existingApplication = await (prisma as unknown as {
-                jobApplication: {
-                    findUnique: (args: {
-                        where: {
-                            userId_jobPostId: {
-                                userId: string;
-                                jobPostId: string;
-                            }
-                        }
-                    }) => Promise<unknown>;
+        // 3. Check if already applied
+        const existingApplication = await prisma.jobApplication.findUnique({
+            where: {
+                userId_jobPostId: {
+                    userId: user.id,
+                    jobPostId: jobId,
                 }
-            }).jobApplication.findUnique({
-                where: {
-                    userId_jobPostId: {
-                        userId: user.id,
-                        jobPostId: jobId,
-                    }
-                }
-            });
-        } catch {
-            console.log("JobApplication model not available yet");
-        }
+            }
+        });
 
         if (existingApplication) {
             throw new Error("You have already applied to this job");
         }
 
-        // Create application
-        try {
-            await (prisma as unknown as {
-                jobApplication: {
-                    create: (args: {
-                        data: {
-                            jobPostId: string;
-                            userId: string;
-                            coverLetter: string | null;
-                            resume: string;
-                            status: string;
-                        }
-                    }) => Promise<unknown>;
-                }
-            }).jobApplication.create({
-                data: {
-                    jobPostId: jobId,
-                    userId: user.id,
-                    coverLetter: coverLetter || null,
-                    resume: resumeUrl || jobSeeker.resume,
-                    status: "PENDING",
-                }
-            });
-        } catch {
-            throw new Error("Application system is currently being updated. Please try again later.");
-        }
+        // 4. Create application
+        await prisma.jobApplication.create({
+            data: {
+                jobPostId: jobId,
+                userId: user.id,
+                coverLetter: coverLetter || null,
+                resume: resumeUrl || jobSeeker.resume,
+                status: "PENDING",
+            }
+        });
 
         revalidatePath(`/job/${jobId}`);
         return { success: true };
@@ -300,38 +306,18 @@ export async function updateApplicationStatus(applicationId: string, status: str
         }
 
         // Verify the application belongs to this company's job
-        let application = null;
-        try {
-            application = await (prisma as unknown as {
-                jobApplication: {
-                    findUnique: (args: {
-                        where: { id: string };
-                        include: {
-                            JobPost: {
-                                select: {
-                                    companyId: true;
-                                }
-                            }
-                        }
-                    }) => Promise<{
-                        JobPost: { companyId: string };
-                    } | null>;
-                }
-            }).jobApplication.findUnique({
-                where: {
-                    id: applicationId,
-                },
-                include: {
-                    JobPost: {
-                        select: {
-                            companyId: true,
-                        }
+        const application = await prisma.jobApplication.findUnique({
+            where: {
+                id: applicationId,
+            },
+            include: {
+                JobPost: {
+                    select: {
+                        companyId: true,
                     }
                 }
-            });
-        } catch {
-            throw new Error("Application system is currently being updated. Please try again later.");
-        }
+            }
+        });
 
         if (!application || application.JobPost.companyId !== company.id) {
             throw new Error("Application not found or access denied");

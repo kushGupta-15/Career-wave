@@ -51,6 +51,22 @@ export const sendPeriodicJobListings = inngest.createFunction(
     async ({ event, step }) => {
         const { userId } = event.data;
 
+        const user = await step.run("fetch-user", async () => {
+            return await prisma.user.findUnique({
+                where: {
+                    id: userId,
+                },
+                select: {
+                    email: true,
+                    name: true,
+                },
+            });
+        });
+
+        if (!user?.email) {
+            return { userId, message: "User or email not found, skipping notifications" };
+        }
+
         const totalDays = 30;
         const intervalDays = 2;
         let currentDay = 0;
@@ -75,36 +91,34 @@ export const sendPeriodicJobListings = inngest.createFunction(
                             }
                         }
                     }
-                })
-            })
+                });
+            });
+
             if (recentJobs.length > 0) {
                 await step.run("send-email", async () => {
                     const jobListingHtml = recentJobs.map((job) =>
-                        `<div style="margin-bottom: 20px; padding: 15px; border: 1px solid
-                    #eee; border-redius: 5px;">
-                    <h3 style = "margin: 0;">${job.jobTitle}</h3>
-                    <p>${job.Company.name} * ${job.location} </p>
-                    <p> $${job.salaryFrom.toLocaleString()} - $${job.salaryTo.toLocaleString()} </p>
-                    </div>
-                    `
-                    )
-                        .join("");
+                        `<div style="margin-bottom: 20px; padding: 15px; border: 1px solid #eee; border-radius: 5px;">
+                        <h3 style="margin: 0;">${job.jobTitle}</h3>
+                        <p>${job.Company.name} • ${job.location}</p>
+                        <p>$${job.salaryFrom.toLocaleString()} - $${job.salaryTo.toLocaleString()}</p>
+                        </div>`
+                    ).join("");
 
                     await resend.emails.send({
                         from: "Career-Wave <onboarding@resend.dev>",
-                        to: ["kushg1517@gmail.com"],
+                        to: [user.email],
                         subject: "Latest Job Opportunities for you",
                         html: `
-                        <div style= "font-family: Arial, sans-serif; max-width: 600px; margin:0 auto;">
-                        <h2>Latest Job Opportunities</h2>
+                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                        <h2>Hello ${user.name || "there"},</h2>
+                        <p>Here are the latest job opportunities on Career Wave that match your profile:</p>
                         ${jobListingHtml}
                         <div style="margin-top: 30px; text-align: center;">
-                        <a href="${process.env.NEXT_PUBLIC_URL}"
-                        style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-redius: 5px;"> View More Jobs</a>
+                        <a href="${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}"
+                        style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">View More Jobs</a>
                         </div>
                         </div>
                         `,
-
                     });
                 });
             }
