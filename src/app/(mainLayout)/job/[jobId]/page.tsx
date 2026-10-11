@@ -6,6 +6,7 @@ import { benefits } from "@/app/utils/listOfBenefits";
 import { JsonToHtml } from "@/components/general/JsonToHtml";
 import { SaveJobButton } from "@/components/general/submitButton";
 import { ApplyJobButton } from "@/components/general/ApplyJobButton";
+import { AiJobMatcher } from "@/components/general/AiJobMatcher";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -16,6 +17,49 @@ import { Heart } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
+
+export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
+  const { jobId } = await params;
+  const job = await prisma.jobPost.findUnique({
+    where: { id: jobId },
+    select: {
+      jobTitle: true,
+      location: true,
+      employmentType: true,
+      Company: {
+        select: {
+          name: true,
+          Logo: true,
+        },
+      },
+    },
+  });
+
+  if (!job) {
+    return {
+      title: "Job Listing | Career Wave",
+    };
+  }
+
+  const title = `${job.jobTitle} at ${job.Company.name} | Career Wave`;
+  const description = `Apply for ${job.jobTitle} at ${job.Company.name} in ${job.location} (${job.employmentType}). View salary details, company benefits, and submit your application on Career Wave.`;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      images: job.Company.Logo ? [{ url: job.Company.Logo }] : [],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
+  };
+}
 
 const aj = arcjet.withRule(
   detectBot({
@@ -272,6 +316,9 @@ export default async function JobIdPage({ params }: { params: Params }) {
             )}
           </div>
         </Card>
+
+        {/* AI Resume & ATS Matcher */}
+        <AiJobMatcher jobId={data.id} isLoggedIn={!!session?.user} />
 
         <Card className="p-6">
           <h3 className="font-semibold">About the Job</h3>
