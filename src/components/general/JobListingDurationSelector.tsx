@@ -41,9 +41,10 @@ export function JobListingDurationSelector({ field }: iAppProps) {
                     </p>
                   </div>
                   <div className="text-right">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                      Free Listing
+                    <span className="text-xl font-bold text-primary">
+                      ${duration.price}
                     </span>
+                    <p className="text-xs text-muted-foreground">one-time</p>
                   </div>
                 </div>
               </Card>

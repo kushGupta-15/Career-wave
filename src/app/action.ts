@@ -11,6 +11,8 @@ import { inngest } from "./utils/inngest/client";
 import { revalidatePath } from "next/cache";
 import { sendApplicationReceivedEmails, sendStatusUpdateEmail } from "./utils/email";
 import { GoogleGenAI } from "@google/genai";
+import { stripe } from "./utils/stripe";
+import { jobListingDurationPricing } from "./utils/jobListingDurationPricing";
 
 const aj = arcjet
     .withRule(
@@ -111,15 +113,16 @@ export async function createJob(data: z.infer<typeof jobPostSchema>) {
 
     const company = await prisma.company.findUnique({
         where: {
-            userId: user.id
+            userId: user.id,
         },
         select: {
             id: true,
-        }
+            name: true,
+        },
     });
 
     if (!company?.id) {
-        return redirect('/onboarding');
+        return redirect("/onboarding");
     }
 
     const jobPost = await prisma.jobPost.create({
@@ -133,27 +136,133 @@ export async function createJob(data: z.infer<typeof jobPostSchema>) {
             salaryTo: validateData.salaryTo,
             benefits: validateData.benefits,
             companyId: company.id,
-            status: "ACTIVE",
+            status: "DRAFT",
         },
         select: {
             id: true,
-        }
+        },
     });
 
-    try {
-        await inngest.send({
-            name: "job/created",
-            data: {
-                jobId: jobPost.id,
-                expirationDays: validateData.listingDuration,
-            }
-        });
-    } catch (inngestError) {
-        console.warn("Inngest event dispatch skipped or failed:", inngestError);
+    const durationPricing =
+        jobListingDurationPricing.find(
+            (p) => p.days === validateData.listingDuration
+        ) || jobListingDurationPricing[0];
+
+    const baseUrl = process.env.NEXT_PUBLIC_URL || "http://localhost:3000";
+
+    const session = await stripe.checkout.sessions.create({
+        customer_email: user.email || undefined,
+        line_items: [
+            {
+                price_data: {
+                    currency: "usd",
+                    unit_amount: Math.round(durationPricing.price * 100),
+                    product_data: {
+                        name: `${validateData.jobTitle} - Job Listing (${durationPricing.days} Days)`,
+                        description: `${durationPricing.description} on CareerWave for ${company.name}`,
+                    },
+                },
+                quantity: 1,
+            },
+        ],
+        mode: "payment",
+        metadata: {
+            jobId: jobPost.id,
+            userId: user.id || "",
+            durationDays: durationPricing.days.toString(),
+        },
+        success_url: `${baseUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${baseUrl}/payment/cancel?job_id=${jobPost.id}`,
+    });
+
+    return { redirectUrl: session.url };
+}
+
+export async function createJobCheckoutSession(jobId: string) {
+    const user = await requireUser();
+    const job = await prisma.jobPost.findUnique({
+        where: { id: jobId },
+        include: { Company: true },
+    });
+
+    if (!job || job.Company.userId !== user.id) {
+        throw new Error("Job listing not found or unauthorized");
     }
 
-    return redirect("/my-jobs");
+    const durationPricing =
+        jobListingDurationPricing.find((p) => p.days === job.listingDuration) ||
+        jobListingDurationPricing[0];
+
+    const baseUrl = process.env.NEXT_PUBLIC_URL || "http://localhost:3000";
+
+    const session = await stripe.checkout.sessions.create({
+        customer_email: user.email || undefined,
+        line_items: [
+            {
+                price_data: {
+                    currency: "usd",
+                    unit_amount: Math.round(durationPricing.price * 100),
+                    product_data: {
+                        name: `${job.jobTitle} - Job Listing (${durationPricing.days} Days)`,
+                        description: `${durationPricing.description} on CareerWave for ${job.Company.name}`,
+                    },
+                },
+                quantity: 1,
+            },
+        ],
+        mode: "payment",
+        metadata: {
+            jobId: job.id,
+            userId: user.id || "",
+            durationDays: durationPricing.days.toString(),
+        },
+        success_url: `${baseUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${baseUrl}/payment/cancel?job_id=${job.id}`,
+    });
+
+    return { redirectUrl: session.url };
 }
+
+export async function activatePaidJob(jobId: string) {
+    const job = await prisma.jobPost.findUnique({
+        where: { id: jobId },
+        select: {
+            id: true,
+            status: true,
+            listingDuration: true,
+            jobTitle: true,
+            Company: {
+                select: {
+                    name: true,
+                },
+            },
+        },
+    });
+
+    if (!job) return null;
+
+    if (job.status !== "ACTIVE") {
+        await prisma.jobPost.update({
+            where: { id: jobId },
+            data: { status: "ACTIVE" },
+        });
+
+        try {
+            await inngest.send({
+                name: "job/created",
+                data: {
+                    jobId: job.id,
+                    expirationDays: job.listingDuration,
+                },
+            });
+        } catch (inngestErr) {
+            console.warn("Inngest event dispatch skipped or failed:", inngestErr);
+        }
+    }
+
+    return job;
+}
+
 
 export async function saveJobPost(jobId: string) {
     const user = await requireUser();

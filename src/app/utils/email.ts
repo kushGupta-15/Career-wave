@@ -41,6 +41,7 @@ export async function sendApplicationReceivedEmails({
           <p>The company will review your application and you will receive notifications when your status is updated.</p>
           <div style="margin-top: 24px;">
             <a href="${APP_URL}/my-applications" style="background-color: #2563eb; color: #fff; padding: 10px 20px; border-radius: 6px; text-decoration: none; display: inline-block;">View My Applications</a>
+            <a href="${APP_URL}/job/${jobId}" style="margin-left: 12px; color: #2563eb; text-decoration: underline; font-size: 14px;">View Job Listing</a>
           </div>
           <hr style="margin-top: 32px; border: none; border-top: 1px solid #e5e7eb;" />
           <p style="font-size: 12px; color: #9ca3af;">Career Wave Job Board</p>

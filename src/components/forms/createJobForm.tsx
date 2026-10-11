@@ -33,6 +33,7 @@ import { Button } from "../ui/button";
 import { XIcon } from "lucide-react";
 import { UploadDropzone } from "../general/uploadthingReexported";
 import { JobListingDurationSelector } from "../general/JobListingDurationSelector";
+import { jobListingDurationPricing } from "@/app/utils/jobListingDurationPricing";
 import { createJob } from "@/app/action";
 import { useState } from "react";
 
@@ -79,7 +80,11 @@ export function CreateJobForm({
     try {
       setPending(true);
       setError(null);
-      await createJob(values);
+      const res = await createJob(values);
+      if (res?.redirectUrl) {
+        window.location.href = res.redirectUrl;
+        return;
+      }
     } catch (error) {
       if (error instanceof Error && error.message !== "NEXT_REDIRECT") {
         console.error("Job creation error:", error);
@@ -395,8 +400,14 @@ export function CreateJobForm({
             </div>
           </CardContent>
         </Card>
-        <Button type="submit" className="w-full" disabled={pending}>
-          {pending ? "Submitting" : "Create Job Post"}
+        <Button type="submit" className="w-full text-base py-6 font-semibold" disabled={pending}>
+          {pending
+            ? "Preparing Checkout..."
+            : `Continue to Payment & Publish ($${
+                jobListingDurationPricing.find(
+                  (p) => p.days === form.watch("listingDuration")
+                )?.price || 99
+              })`}
         </Button>
         
         {error && (
