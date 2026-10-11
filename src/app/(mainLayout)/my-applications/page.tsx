@@ -10,87 +10,66 @@ import Image from "next/image";
 import { Building2, Calendar, MapPin, DollarSign } from "lucide-react";
 
 async function getApplicationsForJobSeeker(userId: string) {
-  try {
-    // First check if user is a job seeker
-    const jobSeeker = await prisma.jobSeeker.findUnique({
+  // First check if user is a job seeker
+  const jobSeeker = await prisma.jobSeeker.findUnique({
+    where: {
+      userId: userId,
+    },
+    select: {
+      id: true,
+      name: true,
+    },
+  });
+
+  if (!jobSeeker) {
+    return redirect("/");
+  }
+
+  const [applications, stats] = await Promise.all([
+    prisma.jobApplication.findMany({
       where: {
         userId: userId,
       },
-      select: {
-        id: true,
-        name: true,
-      },
-    });
-
-    if (!jobSeeker) {
-      return redirect("/");
-    }
-
-    // Try to get applications using raw query as fallback
-    let applications = [];
-    let stats = [];
-
-    try {
-      // Try the normal Prisma query first
-      applications = await prisma.jobApplication.findMany({
-        where: {
-          userId: userId,
-        },
-        include: {
-          JobPost: {
-            select: {
-              id: true,
-              jobTitle: true,
-              location: true,
-              salaryFrom: true,
-              salaryTo: true,
-              employmentType: true,
-              createdAt: true,
-              Company: {
-                select: {
-                  name: true,
-                  Logo: true,
-                  location: true,
-                },
+      include: {
+        JobPost: {
+          select: {
+            id: true,
+            jobTitle: true,
+            location: true,
+            salaryFrom: true,
+            salaryTo: true,
+            employmentType: true,
+            createdAt: true,
+            Company: {
+              select: {
+                name: true,
+                Logo: true,
+                location: true,
               },
             },
           },
         },
-        orderBy: {
-          createdAt: "desc",
-        },
-      });
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    }),
+    prisma.jobApplication.groupBy({
+      by: ["status"],
+      where: {
+        userId: userId,
+      },
+      _count: {
+        status: true,
+      },
+    }),
+  ]);
 
-      const groupByResult = await prisma.jobApplication.groupBy({
-        by: ["status"],
-        where: {
-          userId: userId,
-        },
-        _count: {
-          status: true,
-        },
-      });
-      stats = groupByResult;
-    } catch  {
-      console.log("Prisma model not available yet, using empty data");
-      // Return empty data if model is not available
-      applications = [];
-      stats = [];
-    }
-
-    return {
-      applications,
-      stats,
-      jobSeeker,
-    };
-  } catch (error) {
-    console.error("Error fetching applications:", error);
-    return {
-      applications: [],
-      stats: [],
-      jobSeeker: { id: "temp", name: "User" },
-    };
-  }
+  return {
+    applications,
+    stats,
+    jobSeeker,
+  };
 }
 
 export default async function MyApplicationsPage() {

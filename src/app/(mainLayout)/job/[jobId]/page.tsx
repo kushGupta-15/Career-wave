@@ -49,13 +49,13 @@ function getClient(session: boolean) {
 async function getjob(jobId: string, userId?: string) {
   try {
     const [jobData, savedJob, existingApplication, jobSeeker] = await Promise.all([
-      await prisma.jobPost.findUnique({
+      prisma.jobPost.findUnique({
         where: {
-          status: "ACTIVE",
           id: jobId,
         },
         select: {
           id: true,
+          status: true,
           jobTitle: true,
           jobDescription: true,
           location: true,
@@ -88,26 +88,19 @@ async function getjob(jobId: string, userId?: string) {
           })
         : null,
       userId
-        ? (async () => {
-            try {
-              return await prisma.jobApplication.findUnique({
-                where: {
-                  userId_jobPostId: {
-                    userId: userId,
-                    jobPostId: jobId,
-                  },
-                },
-                select: {
-                  id: true,
-                  status: true,
-                  createdAt: true,
-                },
-              });
-            } catch {
-              console.log("JobApplication model not available yet");
-              return null;
-            }
-          })()
+        ? prisma.jobApplication.findUnique({
+            where: {
+              userId_jobPostId: {
+                userId: userId,
+                jobPostId: jobId,
+              },
+            },
+            select: {
+              id: true,
+              status: true,
+              createdAt: true,
+            },
+          })
         : null,
       userId
         ? prisma.jobSeeker.findUnique({
@@ -157,6 +150,12 @@ export default async function JobIdPage({ params }: { params: Params }) {
   return (
     <div className="grid lg:grid-cols-3 gap-8">
       <div className="space-y-8 col-span-2">
+        {data.status === "EXPIRED" && (
+          <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-700 dark:text-amber-300">
+            <h4 className="font-semibold text-base">This job listing has expired</h4>
+            <p className="text-sm opacity-90">Applications are no longer being accepted for this position.</p>
+          </div>
+        )}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">{data.jobTitle}</h1>
@@ -234,7 +233,12 @@ export default async function JobIdPage({ params }: { params: Params }) {
               </p>
             </div>
             
-            {!session?.user ? (
+            {data.status === "EXPIRED" ? (
+              <div className="text-center py-4 bg-muted/60 rounded-lg border">
+                <p className="text-sm font-semibold text-muted-foreground">Applications Closed</p>
+                <p className="text-xs text-muted-foreground mt-1">This job listing has expired.</p>
+              </div>
+            ) : !session?.user ? (
               <Link href="/login" className={buttonVariants({ className: "w-full" })}>
                 Login to Apply
               </Link>
