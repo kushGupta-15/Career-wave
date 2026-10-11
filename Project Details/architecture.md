@@ -2,7 +2,7 @@
 
 ## 1. High-Level Architecture Overview
 
-Career Wave is designed as a modern, decoupled full-stack web application leveraging the **Next.js 15 App Router** paradigm. It combines Server Components for high-performance rendering, Server Actions for type-safe data mutations, and specialized third-party services for background job scheduling, security shielding, file hosting, and database persistence.
+Career Wave is designed as a modern, decoupled full-stack web application leveraging the **Next.js 15 App Router** architecture. It combines React Server Components (RSC) for high-performance rendering, Server Actions for type-safe data mutations, and specialized third-party services for AI evaluation, payment processing, background job scheduling, security shielding, file hosting, and database persistence.
 
 ### High-Level Architecture Diagram
 
@@ -10,153 +10,184 @@ Career Wave is designed as a modern, decoupled full-stack web application levera
 flowchart TB
     subgraph ClientLayer ["Client Layer (Browser)"]
         UI["React 18 User Interface (Tailwind CSS / Radix UI)"]
-        Forms["Client Forms & Rich Text Editor (Tiptap / React Hook Form)"]
+        Forms["Client Forms & Tiptap Rich Text Editor"]
+        AiModal["AI Matcher & Resume PDF Preview"]
     end
 
     subgraph AppServer ["Next.js 15 App Router Server"]
+        Middleware["Edge Route Protection Middleware"]
         RSC["React Server Components (RSC)"]
         SA["Server Actions (src/app/action.ts)"]
-        API["API Routes (/api/auth, /api/inngest, /api/uploadthing)"]
+        API["API Routes (/api/auth, /api/inngest, /api/webhook/stripe, /api/chat)"]
         Arcjet["Arcjet Security Layer (Shield & Bot Protection)"]
     end
 
     subgraph ThirdParty ["External Services & APIs"]
+        Gemini["Google Gemini 3.8 Flash (GenAI SDK)"]
+        Stripe["Stripe Checkout & Webhooks"]
         NextAuth["NextAuth.js v5 (Google & GitHub OAuth)"]
-        Uploadthing["Uploadthing File Storage (Logos & Resend PDFs)"]
+        Uploadthing["UploadThing Storage (Logos & PDF Resumes)"]
         Resend["Resend Transactional Email Engine"]
         Inngest["Inngest Event Engine (Background Jobs & Schedulers)"]
     end
 
     subgraph DatabaseLayer ["Data Layer"]
         Prisma["Prisma ORM Client v6"]
-        PostgreSQL[("PostgreSQL Database")]
+        PostgreSQL[("PostgreSQL Database (Neon)")]
     end
 
     %% Interactions
-    UI -->|HTTP Requests / User Interaction| RSC
-    Forms -->|Form Submissions / Actions| Arcjet
-    Arcjet -->|Validated Request| SA
+    UI -->|HTTP Requests| Middleware
+    Middleware --> RSC
+    Forms -->|Form Submissions| Arcjet
+    Arcjet -->|Protected Request| SA
     RSC -->|Queries| Prisma
     SA -->|Mutations| Prisma
     Prisma --> PostgreSQL
 
+    SA -->|AI ATS Analysis| Gemini
+    API -->|Live Job Recommendations| Gemini
+    SA -->|Create Checkout Session| Stripe
+    Stripe -->|Payment Webhook| API
     Forms -->|Upload Logo / Resume| Uploadthing
-    SA -->|Trigger Background Expiration| Inngest
-    Inngest -->|Delayed Lifecycle Webhook| API
-    API -->|Expire Job Listing| Prisma
-    Inngest -->|Send Email Alerts| Resend
+    SA -->|Trigger Expiration Timer| Inngest
+    Inngest -->|Delayed Expiration Callback| API
+    API -->|Expire Listing| Prisma
+    SA -->|Send Alerts & Confirmations| Resend
     API -->|Auth Verification| NextAuth
 ```
 
 ---
 
-## 2. Technology Stack
+## 2. Key Architecture Workflows
 
-### 2.1 Core Framework & Runtime
-- **Framework**: [Next.js 15 (App Router)](https://nextjs.org/) using React 18, Server Components, and Server Actions.
+### 2.1 Stripe Checkout & Job Activation Flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Recruiter as Recruiter
+    participant App as Next.js Server Action
+    participant DB as PostgreSQL (Prisma)
+    participant Stripe as Stripe API
+    participant Inngest as Inngest Engine
+
+    Recruiter->>App: Submits job post with duration (e.g. 30 days @ $99)
+    App->>DB: Saves job in DRAFT status
+    App->>Stripe: Creates Checkout Session with metadata { jobId }
+    Stripe-->>App: Returns checkout URL
+    App-->>Recruiter: Redirects to Stripe Checkout
+    Recruiter->>Stripe: Enters test card and confirms payment
+    Stripe->>App: Redirects to /payment/success (or POST /api/webhook/stripe)
+    App->>DB: Updates job status to ACTIVE
+    App->>Inngest: Dispatches 'job/created' event with expirationDays
+    Inngest-->>App: Schedules sleep for durationDays
+    App-->>Recruiter: Displays payment confirmation & live job link
+```
+
+### 2.2 Application Submission & Transactional Email Flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Candidate as Candidate
+    participant Modal as Application Modal
+    participant Action as applyToJob (Server Action)
+    participant DB as PostgreSQL (Prisma)
+    participant Resend as Resend Email API
+
+    Candidate->>Modal: Uploads resume PDF (UploadThing) & submits
+    Modal->>Action: Calls applyToJob(jobId, coverLetter, resumeUrl)
+    Action->>DB: Verifies active listing & candidate record (auto-creates if new)
+    Action->>DB: Creates JobApplication record (status: PENDING)
+    Action->>Resend: Dispatches confirmation email to candidate
+    Action->>Resend: Dispatches new applicant alert to company recruiter
+    Action-->>Modal: Returns { success: true }
+    Modal-->>Candidate: Displays success toast & updates dashboard
+```
+
+---
+
+## 3. Technology Stack Breakdown
+
+### 3.1 Core Framework & Runtime
+- **Framework**: [Next.js 15.1.12](https://nextjs.org/) using React 18, React Server Components (RSC), and Server Actions.
 - **Language**: TypeScript (v5) providing strict static typing across client and server boundaries.
 - **Styling**: Tailwind CSS (v3), `tailwindcss-animate`, `@tailwindcss/typography`, and `clsx` / `tailwind-merge`.
 - **UI Components**: Radix UI primitives (`@radix-ui/react-*`), Lucide Icons (`lucide-react`), Sonner toast notifications, and `next-themes`.
 
-### 2.2 Data Layer & Database
-- **Database**: PostgreSQL relational database.
-- **ORM**: [Prisma ORM v6](https://www.prisma.io/) with `@auth/prisma-adapter` for database schema migrations, client generation, and type-safe query building.
+### 3.2 Artificial Intelligence
+- **SDK**: Official `@google/genai` (v2.28.0).
+- **Model**: `gemini-3.8-flash`.
+- **Workflows**:
+  - Chatbot with dynamic database injection for intelligent job matching.
+  - Resume ATS analyzer returning structured JSON (score percentage, candidate strengths, and keyword gap recommendations).
 
-### 2.3 Authentication & Authorization
+### 3.3 Payments & Monetization
+- **SDK**: `stripe` (v23+).
+- **Integration**: Hosted Stripe Checkout Sessions supporting customized durations ($29 - $399).
+- **Webhooks**: Endpoint `/api/webhook/stripe` verifying `checkout.session.completed` events.
+
+### 3.4 Data Layer & Database
+- **Database**: PostgreSQL (Neon Serverless).
+- **ORM**: [Prisma ORM v6](https://www.prisma.io/) with `@auth/prisma-adapter`.
+- **Integrity**: Cascading deletes (`onDelete: Cascade`) on company, seeker, application, and session relations.
+
+### 3.5 Authentication & Authorization
 - **Authentication**: NextAuth.js v5 (`next-auth@5.0.0-beta.25`) with Google OAuth and GitHub OAuth providers.
-- **Session Management**: Database-backed sessions stored in PostgreSQL `Session` and `Account` tables.
-- **User Scoping**: Utility functions (`requireUser`) enforcing authenticated state and role validation (`COMPANY` vs `JOB_SEEKER`).
+- **Edge Middleware**: Next.js route protection middleware ensuring unauthenticated requests cannot access recruiter or candidate portals.
 
-### 2.4 Background Jobs & Event Workflows
+### 3.6 Background Workflows & Email
 - **Workflows**: [Inngest SDK](https://www.inngest.com/) (`inngest@^3.54.2`).
-- **Event Handlers**:
-  - `handleJobExpiration`: Schedules delayed job status transition to `EXPIRED` based on listing duration. Listens for cancellation events on job deletion.
-  - `sendPeriodicJobListings`: Triggered on candidate onboarding for dispatching active job alerts.
+- **Handlers**: Automated job post expiration with cancellation support upon manual job deletion.
+- **Transactional Email**: [Resend](https://resend.com/) delivering structured HTML notification templates for candidates and recruiters.
 
-### 2.5 File Management
-- **File Uploads**: [Uploadthing](https://uploadthing.com/) (`uploadthing` & `@uploadthing/react`).
-- **Use Cases**: Uploading company logos (images) and candidate resumes (PDFs) with strict MIME-type validation.
-
-### 2.6 Security & Bot Shielding
+### 3.7 Security & Bot Shielding
 - **Security SDK**: [Arcjet](https://arcjet.com/) (`@arcjet/next`).
-- **Protections**: Enforces `shield()` and `detectBot()` rules on all mutating server actions to prevent automated form submissions and abuse.
-
-### 2.7 Content Formatting & Utilities
-- **Rich Text Editor**: Tiptap Editor (`@tiptap/react`, `@tiptap/starter-kit`, color, typography, text-align extensions).
-- **Form Validation**: React Hook Form with `@hookform/resolvers` and Zod schemas (`zodSchema.ts`).
-- **Email Dispatch**: Resend SDK (`resend`).
+- **Protections**: Rate limiting, request shielding, and bot detection across server actions and API routes.
 
 ---
 
-## 3. Detailed Folder & File Structure
+## 4. Directory Structure
 
 ```
-career-wave/
+Career-wave/
 ├── prisma/
-│   └── schema.prisma                 # Database models (User, Company, JobSeeker, JobPost, JobApplication, SavedJobPost, Auth models)
-├── public/                           # Static assets, logos, and public images
-├── scripts/                          # Maintenance and utility scripts
+│   └── schema.prisma                 # Database models (User, Company, JobSeeker, JobPost, JobApplication, SavedJobPost)
+├── public/                           # Static assets and brand logos
 ├── src/
 │   ├── app/
-│   │   ├── (mainLayout)/             # Layout group for authenticated & primary application views
-│   │   │   ├── applications/         # Company ATS dashboard for managing candidate applications
-│   │   │   ├── favorites/            # Job seeker saved jobs dashboard
-│   │   │   ├── job/                  # Public job detail views & application forms
-│   │   │   │   └── [jobId]/          # Dynamic route for job details & apply page
-│   │   │   ├── jobs/                 # Company edit & manage job route
-│   │   │   │   └── [jobId]/edit/     # Dynamic route for editing existing posts
-│   │   │   ├── my-applications/      # Job seeker dashboard for tracking application status
-│   │   │   ├── my-jobs/              # Company job management view (active/draft/expired posts)
-│   │   │   ├── post-job/             # Employer job post creation form
-│   │   │   ├── layout.tsx            # Main layout wrapper with Navbar and Footer
-│   │   │   └── page.tsx              # Public home/landing page with job search & filters
+│   │   ├── (mainLayout)/             # Core application layout and pages
+│   │   │   ├── applications/         # Recruiter ATS candidate management & PDF preview
+│   │   │   ├── company/[companyId]/  # Public company profile page
+│   │   │   ├── favorites/            # Saved jobs dashboard for candidates
+│   │   │   ├── job/[jobId]/          # Job details, apply modal & AI match analyzer
+│   │   │   ├── jobs/                 # Browse all active jobs directory
+│   │   │   ├── my-applications/      # Candidate tracking dashboard & withdrawal
+│   │   │   ├── my-jobs/              # Recruiter dashboard with KPI analytics & draft checkout
+│   │   │   ├── payment/              # Stripe checkout return pages (success & cancel)
+│   │   │   ├── post-job/             # Job post creation with duration pricing
+│   │   │   └── page.tsx              # Public landing page with search
 │   │   ├── api/                      # Serverless API routes
-│   │   │   ├── auth/                 # NextAuth route handlers ([...nextauth])
-│   │   │   ├── chat/                 # Canned chatbot API route
-│   │   │   ├── inngest/              # Inngest background function execution endpoint
-│   │   │   └── uploadthing/          # Uploadthing core API route for file uploads
-│   │   ├── login/                    # Authentication login page
-│   │   ├── onboarding/               # User persona setup page (Company vs JobSeeker)
-│   │   ├── utils/                    # Shared utilities and configurations
-│   │   │   ├── arcjet.ts             # Arcjet security configuration
-│   │   │   ├── auth.ts               # NextAuth setup and helper exports
-│   │   │   ├── db.ts                 # Prisma singleton instance
-│   │   │   ├── formatCurrency.ts     # Salary formatting helper
-│   │   │   ├── formatRelativeTime.tsx# Relative time helper
-│   │   │   ├── inngest/              # Inngest client configuration
-│   │   │   ├── jobListingDurationPricing.ts # Listing duration pricing calculator
-│   │   │   ├── listOfBenefits.tsx    # Available benefit tags dictionary
-│   │   │   ├── requireuser.ts        # Server action user authentication check
-│   │   │   ├── searchAnalytics.ts    # Search analytics utility
-│   │   │   └── zodSchemas.ts         # Zod schemas for form validation
-│   │   ├── action.ts                 # Server actions (Job creation, application, status updates, saved jobs)
-│   │   ├── globals.css               # Tailwind & root CSS custom properties
-│   │   └── layout.tsx                # Root HTML layout with ThemeProvider and Sonner Toaster
+│   │   │   ├── auth/[...nextauth]/   # NextAuth authentication handlers
+│   │   │   ├── chat/                 # Gemini 3.8 Flash AI assistant route
+│   │   │   ├── inngest/              # Inngest background event endpoint
+│   │   │   ├── uploadthing/          # UploadThing file upload endpoint
+│   │   │   └── webhook/stripe/       # Stripe checkout webhook handler
+│   │   ├── action.ts                 # Type-safe Next.js Server Actions
+│   │   ├── middleware.ts             # Route protection middleware
+│   │   └── utils/                    # Shared utilities
+│   │       ├── arcjet.ts             # Arcjet security configuration
+│   │       ├── auth.ts               # NextAuth setup and helper exports
+│   │       ├── db.ts                 # Prisma singleton instance
+│   │       ├── email.ts              # Resend email templates & dispatcher
+│   │       ├── stripe.ts             # Stripe singleton instance
+│   │       └── zodSchemas.ts         # Zod schemas for form validation
 │   ├── components/
 │   │   ├── forms/                    # Form components
-│   │   │   ├── onboarding/           # Company and JobSeeker onboarding forms
-│   │   │   ├── createJobForm.tsx     # Job post creation form
-│   │   │   ├── EditJobForm.tsx       # Job post editing form
-│   │   │   ├── JobApplicationForm.tsx# Candidate application form
-│   │   │   └── LoginForm.tsx         # OAuth sign-in form buttons
-│   │   ├── general/                  # Application UI widgets & shared components
-│   │   │   ├── ApplicationsTable.tsx # ATS applications table with status dropdown & notes modal
-│   │   │   ├── ApplyJobButton.tsx    # Job application submission button wrapper
-│   │   │   ├── BenefitsSelector.tsx  # Multi-select checkbox grid for job benefits
-│   │   │   ├── ChatBot.tsx           # Floating chatbot UI widget
-│   │   │   ├── Jobcard.tsx           # Individual job post card component
-│   │   │   ├── Jobfilter.tsx         # Search filter sidebar (job type, location, salary)
-│   │   │   ├── JobListing.tsx        # Server-rendered job list container
-│   │   │   ├── MainPagination.tsx    # Job list page pagination controls
-│   │   │   ├── Navbar.tsx            # Header navigation bar with role-based links
-│   │   │   ├── SearchBar.tsx         # Main search input with filter selectors
-│   │   │   └── UserDropdawn.tsx      # User avatar menu dropdown with logout/dashboard links
-│   │   ├── richTextEditor.tsx/       # Tiptap rich text editor implementation
-│   │   └── ui/                       # Reusable UI primitives (Button, Card, Input, etc.)
-│   └── lib/                          # Classname merger helper (utils.ts)
-├── .env                              # Environment variables (DB URL, Auth secret, Arcjet key)
-├── next.config.mjs                   # Next.js configuration
-├── package.json                      # Node.js dependencies & scripts
-├── tailwind.config.ts                # Tailwind CSS design system configuration
-└── tsconfig.json                     # TypeScript compiler settings
+│   │   ├── general/                  # Shared UI components (AI Matcher, Table, Cards, PDF Preview)
+│   │   ├── richTextEditor.tsx/       # Tiptap rich-text editor components
+│   │   └── ui/                       # Radix UI primitives
+│   └── lib/                          # Utility functions
+└── package.json                      # Project dependencies & scripts
 ```
