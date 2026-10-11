@@ -75,6 +75,71 @@ Built with **Next.js 15 (App Router)**, **TypeScript**, **PostgreSQL**, **Prisma
 
 ---
 
+## 🏛️ System Architecture
+
+```mermaid
+flowchart TD
+    subgraph Clients["🖥️ Client Layer (Browser)"]
+        User["Job Seekers & Recruiters"]
+        UI["React 18 / Tailwind CSS / Radix UI"]
+        AI_UI["AI Matcher & Chat Modal"]
+        PDF_UI["In-Browser PDF Viewer"]
+        User --> UI
+        UI --- AI_UI
+        UI --- PDF_UI
+    end
+
+    subgraph Security["🛡️ Edge Security & Gateway"]
+        MW["Next.js Edge Middleware (Route Guard)"]
+        AJ["Arcjet WAF (Bot Detection & Rate Limiting)"]
+    end
+
+    subgraph AppServer["⚡ Next.js 15 App Router Server"]
+        RSC["React Server Components (SSR / Fast Load)"]
+        SA["Server Actions (action.ts - Form Mutations)"]
+        API["API Routes (/api/chat, /api/webhook/stripe, /api/inngest)"]
+    end
+
+    subgraph External["☁️ Third-Party Cloud Services"]
+        Gemini["Google Gemini 3.8 Flash (ATS Resume Analyzer & Chatbot)"]
+        Stripe["Stripe Checkout (Tiered Payments & Webhooks)"]
+        Inngest["Inngest (Durable Event Scheduling & Job Expiration)"]
+        UploadThing["UploadThing (PDF Resumes & Company Logos)"]
+        Resend["Resend (Transactional Status Emails)"]
+        Auth["NextAuth.js v5 (Google & GitHub OAuth)"]
+    end
+
+    subgraph DataLayer["🗄️ Persistence Layer"]
+        Prisma["Prisma ORM Client v6"]
+        Postgres[("Neon Serverless PostgreSQL")]
+    end
+
+    %% Client to Security & Server
+    UI -->|Page Requests| MW
+    MW --> RSC
+    UI -->|Forms & Actions| AJ
+    AJ --> SA
+    UI -->|Uploads| UploadThing
+
+    %% Server Actions & APIs to Cloud Services
+    SA -->|ATS Scoring| Gemini
+    API -->|Live Job Search Chat| Gemini
+    SA -->|Create Session| Stripe
+    Stripe -->|Payment Webhook| API
+    SA -->|Schedule Expiration| Inngest
+    Inngest -->|Delayed Expiration Callback| API
+    SA -->|Send Alerts| Resend
+    MW -->|Verify Token| Auth
+
+    %% Database operations
+    RSC -->|Read Queries| Prisma
+    SA -->|Write Mutations| Prisma
+    API -->|Webhook Updates| Prisma
+    Prisma --> Postgres
+```
+
+---
+
 ## 📁 Project Structure
 
 ```
