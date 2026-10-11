@@ -180,14 +180,39 @@ type Params = Promise<{ jobId: string }>;
 export default async function JobIdPage({ params }: { params: Params }) {
   const { jobId } = await params;
   const session = await auth();
-  const req = await request();
-  const decision = await getClient(!!session).protect(req, { requested: 10 });
 
-  if (decision.isDenied()) {
-    throw new Error("forbidden");
+  let isDenied = false;
+  if (process.env.ARCJET_KEY) {
+    try {
+      const req = await request();
+      const decision = await getClient(!!session).protect(req, { requested: 1 });
+      if (decision.isDenied()) {
+        isDenied = true;
+      }
+    } catch (e) {
+      console.warn("Arcjet rate limiter bypassed:", e);
+    }
+  }
+
+  if (isDenied) {
+    return (
+      <div className="max-w-xl mx-auto py-16 text-center">
+        <h2 className="text-xl font-bold">Too Many Requests</h2>
+        <p className="text-muted-foreground mt-2">
+          Please wait a few seconds before refreshing this job listing.
+        </p>
+      </div>
+    );
   }
 
   const { jobData: data, savedJob, existingApplication, jobSeeker } = await getjob(jobId, session?.user?.id);
+
+  let jobDescriptionJson = null;
+  try {
+    jobDescriptionJson = JSON.parse(data.jobDescription);
+  } catch {
+    jobDescriptionJson = null;
+  }
   
   // Check if current user is the company owner
   const isCompanyOwner = session?.user?.id === data.Company.userId;
@@ -235,7 +260,13 @@ export default async function JobIdPage({ params }: { params: Params }) {
           ) : null}
         </div>
         <section>
-          <JsonToHtml json={JSON.parse(data.jobDescription)} />
+          {jobDescriptionJson ? (
+            <JsonToHtml json={jobDescriptionJson} />
+          ) : (
+            <div className="prose dark:prose-invert max-w-none whitespace-pre-line text-muted-foreground">
+              {data.jobDescription}
+            </div>
+          )}
         </section>
         <section>
           <h3 className="font-semibold mb-4">
@@ -341,7 +372,7 @@ export default async function JobIdPage({ params }: { params: Params }) {
               <span className="text-sm">
                 {new Date(
                   data.createdAt.getTime() +
-                    data.listingDuration * 24 * 60 * 60 * 1000
+                    (data.listingDuration || 30) * 24 * 60 * 60 * 1000
                 ).toLocaleDateString("en-US", {
                   month: "long",
                   day: "numeric",

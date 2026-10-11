@@ -2,7 +2,14 @@
 
 import { useState } from "react";
 import { Button } from "../ui/button";
-import { Dialog, DialogContent, DialogTrigger } from "../ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "../ui/dialog";
 import { JobApplicationForm } from "../forms/JobApplicationForm";
 
 interface ApplyJobButtonProps {
@@ -33,6 +40,12 @@ export function ApplyJobButton({
         <Button className="w-full">Apply Now</Button>
       </DialogTrigger>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Apply for {jobTitle}</DialogTitle>
+          <DialogDescription>
+            Submit your application and resume to {companyName}.
+          </DialogDescription>
+        </DialogHeader>
         <JobApplicationForm
           jobId={jobId}
           jobTitle={jobTitle}
