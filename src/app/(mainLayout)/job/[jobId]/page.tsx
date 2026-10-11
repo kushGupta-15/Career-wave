@@ -65,6 +65,7 @@ async function getjob(jobId: string, userId?: string) {
           listingDuration: true,
           Company: {
             select: {
+              id: true,
               name: true,
               location: true,
               Logo: true,
@@ -315,24 +316,29 @@ export default async function JobIdPage({ params }: { params: Params }) {
             </div>
           </div>
         </Card>
-        <Card className="p-6">
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <Image
-                src={data.Company.Logo}
-                alt="Company Logo"
-                height={48}
-                width={48}
-                className="rounded-full size-12"
-              />
-              <div className="flex flex-col">
-                <h3 className="font-semibold">{data.Company.name}</h3>
-                <p className="text-sm text-muted-foreground line-clamp-3">
-                  {data.Company.about}
-                </p>
+        <Card className="p-6 hover:border-primary/50 transition-colors">
+          <Link href={`/company/${data.Company.id}`} className="block group">
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Image
+                  src={data.Company.Logo}
+                  alt="Company Logo"
+                  height={48}
+                  width={48}
+                  className="rounded-full size-12 object-cover border"
+                />
+                <div className="flex flex-col">
+                  <h3 className="font-semibold group-hover:text-primary transition-colors flex items-center gap-1.5">
+                    {data.Company.name}
+                    <span className="text-xs text-muted-foreground font-normal">→</span>
+                  </h3>
+                  <p className="text-sm text-muted-foreground line-clamp-3">
+                    {data.Company.about}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
+          </Link>
         </Card>
       </div>
     </div>

@@ -8,6 +8,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { Building2, Calendar, MapPin, DollarSign } from "lucide-react";
+import { WithdrawApplicationButton } from "@/components/general/WithdrawApplicationButton";
 
 async function getApplicationsForJobSeeker(userId: string) {
   // First check if user is a job seeker
@@ -220,11 +221,17 @@ export default async function MyApplicationsPage() {
                         </div>
                       </div>
 
-                      {/* Application Status */}
-                      <div className="flex-shrink-0">
+                      {/* Application Status & Actions */}
+                      <div className="flex-shrink-0 flex items-center gap-2">
                         <Badge className={getStatusColor(application.status)}>
                           {application.status.charAt(0) + application.status.slice(1).toLowerCase()}
                         </Badge>
+                        {application.status !== "HIRED" && (
+                          <WithdrawApplicationButton
+                            applicationId={application.id}
+                            jobTitle={application.JobPost.jobTitle}
+                          />
+                        )}
                       </div>
                     </div>
 

@@ -223,21 +223,29 @@ function ApplicationDetails({
         </div>
       )}
 
-      {/* Resume */}
+      {/* Resume with Embedded Preview */}
       <div>
-        <h4 className="font-semibold mb-2 flex items-center gap-2">
-          <FileText className="h-4 w-4" />
-          Resume
-        </h4>
-        <Link
-          href={application.resume}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 text-primary hover:underline"
-        >
-          <FileText className="h-4 w-4" />
-          View Resume (PDF)
-        </Link>
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="font-semibold flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Resume Preview
+          </h4>
+          <Link
+            href={application.resume}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-primary hover:underline flex items-center gap-1 font-medium"
+          >
+            Open in new tab ↗
+          </Link>
+        </div>
+        <div className="border rounded-lg overflow-hidden bg-muted/30 h-80 w-full shadow-inner">
+          <iframe
+            src={application.resume}
+            className="w-full h-full"
+            title={`${application.User.name || "Candidate"}'s Resume`}
+          />
+        </div>
       </div>
 
       {/* Status Update */}

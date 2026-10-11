@@ -9,6 +9,7 @@ import arcjet, { detectBot, shield } from "./utils/arcjet";
 import { request } from "@arcjet/next";
 import { inngest } from "./utils/inngest/client";
 import { revalidatePath } from "next/cache";
+import { sendApplicationReceivedEmails, sendStatusUpdateEmail } from "./utils/email";
 
 const aj = arcjet
     .withRule(
@@ -213,9 +214,16 @@ export async function applyToJob(jobId: string, coverLetter?: string, resumeUrl?
             },
             select: {
                 status: true,
+                jobTitle: true,
                 Company: {
                     select: {
+                        name: true,
                         userId: true,
+                        user: {
+                            select: {
+                                email: true,
+                            }
+                        }
                     }
                 }
             }
@@ -240,7 +248,14 @@ export async function applyToJob(jobId: string, coverLetter?: string, resumeUrl?
             },
             select: {
                 id: true,
+                name: true,
                 resume: true,
+                user: {
+                    select: {
+                        email: true,
+                        name: true,
+                    }
+                }
             }
         });
 
@@ -273,6 +288,16 @@ export async function applyToJob(jobId: string, coverLetter?: string, resumeUrl?
             }
         });
 
+        // 5. Fire automated email notifications (safe background dispatch)
+        sendApplicationReceivedEmails({
+            candidateEmail: jobSeeker.user.email,
+            candidateName: jobSeeker.name || jobSeeker.user.name || "Candidate",
+            companyEmail: job.Company.user?.email,
+            companyName: job.Company.name,
+            jobTitle: job.jobTitle,
+            jobId,
+        }).catch((err) => console.warn("Application email dispatch failed:", err));
+
         revalidatePath(`/job/${jobId}`);
         return { success: true };
     } catch (error) {
@@ -298,6 +323,7 @@ export async function updateApplicationStatus(applicationId: string, status: str
             },
             select: {
                 id: true,
+                name: true,
             }
         });
 
@@ -313,7 +339,14 @@ export async function updateApplicationStatus(applicationId: string, status: str
             include: {
                 JobPost: {
                     select: {
+                        jobTitle: true,
                         companyId: true,
+                    }
+                },
+                User: {
+                    select: {
+                        email: true,
+                        name: true,
                     }
                 }
             }
@@ -333,12 +366,61 @@ export async function updateApplicationStatus(applicationId: string, status: str
             }
         });
 
+        // Fire status update email to candidate
+        sendStatusUpdateEmail({
+            candidateEmail: application.User.email,
+            candidateName: application.User.name || "Candidate",
+            companyName: company.name,
+            jobTitle: application.JobPost.jobTitle,
+            newStatus: status,
+            companyNotes,
+        }).catch((err) => console.warn("Status update email dispatch failed:", err));
+
         revalidatePath("/applications");
         return { success: true };
     } catch (error) {
         console.error("Error updating application status:", error);
         throw error;
     }
+}
+
+export async function withdrawApplication(applicationId: string) {
+    const user = await requireUser();
+    const req = await request();
+    const decision = await aj.protect(req);
+
+    if (decision.isDenied()) {
+        throw new Error("Forbidden");
+    }
+
+    const application = await prisma.jobApplication.findUnique({
+        where: {
+            id: applicationId,
+        },
+        select: {
+            userId: true,
+            jobPostId: true,
+            status: true,
+        }
+    });
+
+    if (!application || application.userId !== user.id) {
+        throw new Error("Application not found or access denied");
+    }
+
+    if (application.status === "HIRED") {
+        throw new Error("Cannot withdraw an application that has already been hired");
+    }
+
+    await prisma.jobApplication.delete({
+        where: {
+            id: applicationId,
+        }
+    });
+
+    revalidatePath("/my-applications");
+    revalidatePath(`/job/${application.jobPostId}`);
+    return { success: true };
 }
 
 export async function editJobPost(data: z.infer<typeof jobPostSchema>, jobId: string) {
