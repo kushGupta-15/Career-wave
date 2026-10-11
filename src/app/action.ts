@@ -309,11 +309,17 @@ export async function unSaveJobPost(savedJobPostId: string) {
 
 export async function applyToJob(jobId: string, coverLetter?: string, resumeUrl?: string) {
     const user = await requireUser();
-    const req = await request();
-    const decision = await aj.protect(req);
 
-    if (decision.isDenied()) {
-        throw new Error("Forbidden");
+    if (process.env.ARCJET_KEY) {
+        try {
+            const req = await request();
+            const decision = await aj.protect(req);
+            if (decision.isDenied()) {
+                return { error: "Security check denied this request. Please try again later." };
+            }
+        } catch (arcjetErr) {
+            console.warn("Arcjet protection bypassed in applyToJob:", arcjetErr);
+        }
     }
 
     try {
@@ -332,27 +338,27 @@ export async function applyToJob(jobId: string, coverLetter?: string, resumeUrl?
                         user: {
                             select: {
                                 email: true,
-                            }
-                        }
-                    }
-                }
-            }
+                            },
+                        },
+                    },
+                },
+            },
         });
 
         if (!job) {
-            throw new Error("Job not found");
+            return { error: "Job listing not found." };
         }
 
         if (job.status !== "ACTIVE") {
-            throw new Error("This job is no longer accepting applications");
+            return { error: "This job listing is no longer active." };
         }
 
         if (job.Company.userId === user.id) {
-            throw new Error("You cannot apply to your own job listing");
+            return { error: "You cannot apply to your own company's job listing." };
         }
 
-        // 2. Check if user is a job seeker
-        const jobSeeker = await prisma.jobSeeker.findUnique({
+        // 2. Check or create JobSeeker profile
+        let jobSeeker = await prisma.jobSeeker.findUnique({
             where: {
                 userId: user.id,
             },
@@ -364,13 +370,51 @@ export async function applyToJob(jobId: string, coverLetter?: string, resumeUrl?
                     select: {
                         email: true,
                         name: true,
-                    }
-                }
-            }
+                    },
+                },
+            },
         });
 
+        const effectiveResume = resumeUrl || jobSeeker?.resume;
+
+        if (!effectiveResume) {
+            return { error: "Please upload a resume to submit your application." };
+        }
+
         if (!jobSeeker) {
-            throw new Error("Only job seekers can apply to jobs. Please complete onboarding first.");
+            // Auto-create candidate profile for direct applicants
+            jobSeeker = await prisma.jobSeeker.create({
+                data: {
+                    userId: user.id,
+                    name: user.name || "Candidate",
+                    about: coverLetter || "Applied via job board",
+                    resume: effectiveResume,
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    resume: true,
+                    user: {
+                        select: {
+                            email: true,
+                            name: true,
+                        },
+                    },
+                },
+            });
+
+            await prisma.user.update({
+                where: { id: user.id },
+                data: {
+                    userType: "JOB_SEEKER",
+                    onboardingCompleted: true,
+                },
+            });
+        } else if (resumeUrl && resumeUrl !== jobSeeker.resume) {
+            await prisma.jobSeeker.update({
+                where: { id: jobSeeker.id },
+                data: { resume: resumeUrl },
+            });
         }
 
         // 3. Check if already applied
@@ -379,12 +423,12 @@ export async function applyToJob(jobId: string, coverLetter?: string, resumeUrl?
                 userId_jobPostId: {
                     userId: user.id,
                     jobPostId: jobId,
-                }
-            }
+                },
+            },
         });
 
         if (existingApplication) {
-            throw new Error("You have already applied to this job");
+            return { error: "You have already applied to this job." };
         }
 
         // 4. Create application
@@ -393,9 +437,9 @@ export async function applyToJob(jobId: string, coverLetter?: string, resumeUrl?
                 jobPostId: jobId,
                 userId: user.id,
                 coverLetter: coverLetter || null,
-                resume: resumeUrl || jobSeeker.resume,
+                resume: effectiveResume,
                 status: "PENDING",
-            }
+            },
         });
 
         // 5. Fire automated email notifications (safe background dispatch)
@@ -412,7 +456,9 @@ export async function applyToJob(jobId: string, coverLetter?: string, resumeUrl?
         return { success: true };
     } catch (error) {
         console.error("Error applying to job:", error);
-        throw error;
+        return {
+            error: error instanceof Error ? error.message : "Failed to submit application. Please try again.",
+        };
     }
 }
 

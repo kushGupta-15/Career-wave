@@ -49,12 +49,21 @@ export function JobApplicationForm({
   });
 
   const onSubmit = async (values: z.infer<typeof applicationSchema>) => {
+    const resumeToUse = uploadedResumeUrl || existingResumeUrl;
+
+    if (!resumeToUse) {
+      toast.error("Please upload your resume before submitting.");
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       
-      const resumeToUse = uploadedResumeUrl || existingResumeUrl;
-      
-      await applyToJob(jobId, values.coverLetter, resumeToUse);
+      const res = await applyToJob(jobId, values.coverLetter, resumeToUse);
+      if (res?.error) {
+        toast.error(res.error);
+        return;
+      }
       
       toast.success("Application submitted successfully!");
       onSuccess();
@@ -132,7 +141,9 @@ export function JobApplicationForm({
               <UploadDropzone
                 endpoint="resumeUploader"
                 onClientUploadComplete={(res) => {
-                  setUploadedResumeUrl(res[0].url);
+                  const item = res[0] as { ufsUrl?: string; url: string };
+                  const url = item.ufsUrl || item.url;
+                  setUploadedResumeUrl(url);
                   toast.success("Resume uploaded successfully!");
                 }}
                 onUploadError={(error) => {
