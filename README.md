@@ -26,6 +26,86 @@ Built with **Next.js 15 (App Router)**, **TypeScript**, **PostgreSQL**, **Prisma
 
 ---
 
+## 📸 Visual Walkthrough & Core Platform Features
+
+Explore the core user experiences and engineering capabilities of Career Wave through full-resolution production captures:
+
+### 1. 🔍 Candidate Discovery & Job Search Experience
+
+#### 🌟 Modern Landing Experience
+High-performance hero section featuring instant job & company search, category discovery pills, sorting mechanisms, and dynamic call-to-actions.
+
+![Homepage Hero](docs/screenshots/01-landing-hero.png)
+
+#### 📊 Platform Statistics & Workflow Highlights
+Production landing overview showcasing live platform stats, a 3-step "How It Works" workflow card grid, and value propositions.
+
+![Landing Full Overview](docs/screenshots/02-landing-full-overview.png)
+
+#### 🎯 Faceted Job Search & Filter System
+Full-scale job directory equipped with multi-attribute filtering (Job Types, Location, Date Posted) and interactive dynamic salary range sliders ($0–$200k).
+
+![Faceted Job Directory](docs/screenshots/03-jobs-search-directory.png)
+
+#### 📄 Rich Job Listing Details & Company Overview
+Comprehensive job listing layout featuring salary ranges, benefit tags (401k, distributed team, healthcare), structured job descriptions rendered via Tiptap, and linked employer profile cards.
+
+![Job Details Overview](docs/screenshots/04-job-details-overview.png)
+
+---
+
+### 2. 🤖 AI-Powered Superchargers (Google Gemini 3.8 Flash)
+
+#### ⚡ Real-Time ATS Resume & Compatibility Matcher
+Powered by the `@google/genai` SDK using `gemini-3.8-flash`. Job seekers can evaluate their profile against any target job listing to receive instant match percentage scores, strengths analysis, and keyword gap recommendations.
+
+![AI Resume & ATS Matcher](docs/screenshots/05-ai-resume-ats-matcher.png)
+
+#### 💬 Conversational Career Discovery Assistant
+A floating real-time chat interface connected to `/api/chat`. Grounded in live PostgreSQL job database records, it suggests active openings based on conversational queries regarding compensation, remote preferences, and technology requirements.
+
+![AI Career Assistant Chatbot](docs/screenshots/06-ai-career-assistant.png)
+
+---
+
+### 3. 💼 Recruiter Suite, ATS Pipeline & Monetization
+
+#### 📈 Executive Recruiter Dashboard & Listing Management
+Recruiter command center displaying real-time KPI metrics cards (Total Listings, Active Posts, Total Applicants, Candidate Saves) and an interactive listing management table featuring one-click Stripe "Pay & Publish" for draft listings.
+
+![Recruiter Dashboard](docs/screenshots/09-recruiter-dashboard.png)
+
+#### 👥 Candidate ATS Application Pipeline
+Dedicated recruiter applicant management table (`/applications`) tracking candidates across their lifecycle (`PENDING`, `REVIEWED`, `SHORTLISTED`, `INTERVIEWED`, `HIRED`, `REJECTED`) with applied job titles and relative submission timestamps.
+
+![Recruiter ATS Pipeline](docs/screenshots/10-recruiter-ats-pipeline.png)
+
+#### 📑 In-Browser PDF Resume Preview & Status Evaluation
+Recruiter evaluation modal allowing hiring managers to inspect candidate resumes directly within an embedded in-browser viewer without external downloads, update applicant status in real time, and append internal team notes.
+
+![In-Browser PDF Resume Preview & Evaluation Modal](docs/screenshots/12-candidate-detail-modal.png)
+
+#### 💳 Job Creation & Tiered Stripe Duration Pricing
+Intuitive job submission form equipped with a Tiptap rich-text editor, benefit chips, and 4 selectable duration pricing tiers ($29 for 7 days, $49 for 30 days, $149 for 90 days, $399 for 180 days) powered by Stripe Checkout.
+
+![Job Creation & Duration Pricing Tiers](docs/screenshots/08-post-job-and-pricing.png)
+
+---
+
+### 4. 🏢 Company Showcase & Security Gateway
+
+#### 🏛️ Public Employer Showcase Profile
+Dedicated company showcase page (`/company/[companyId]`) displaying verified company branding, bio, official website links, and all active job openings.
+
+![Public Company Profile](docs/screenshots/11-company-profile.png)
+
+#### 🔐 Role-Based Authentication Gateway
+NextAuth.js v5 authentication portal supporting Google and GitHub OAuth providers with automatic role-based routing (Employer vs. Job Seeker).
+
+![Authentication Gateway](docs/screenshots/07-login-authentication.png)
+
+---
+
 ## ✨ Key Features
 
 ### 🤖 1. AI-Powered Portfolio Superchargers
